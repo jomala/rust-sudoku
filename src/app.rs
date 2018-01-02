@@ -37,9 +37,9 @@ impl App {
             clear([1.0; 4], g);
 
             let pointed_cell = field::Coords{
-                x: (self.mouse_coords.x / self.settings.cell_size.x as f64)
+                x: (self.mouse_coords.x / f64::from(self.settings.cell_size.x))
                     .floor() as u8,
-                y: (self.mouse_coords.y / self.settings.cell_size.y as f64)
+                y: (self.mouse_coords.y / f64::from(self.settings.cell_size.y))
                     .floor() as u8 };
             rectangle([0.95, 0.95, 0.95, 1.0],
                       [(pointed_cell.x as f64) * self.settings.cell_size.x,
@@ -144,8 +144,8 @@ impl App {
 
     fn on_key_down(&mut self, pressed_key: &Key) {
         let key_digit_mapping = [
-            (Key::D1, 1), (Key::D2, 2), (Key::D3, 3), 
-            (Key::D4, 4), (Key::D5, 5), (Key::D6, 6), 
+            (Key::D1, 1), (Key::D2, 2), (Key::D3, 3),
+            (Key::D4, 4), (Key::D5, 5), (Key::D6, 6),
             (Key::D7, 7), (Key::D8, 8), (Key::D9, 9) ];
         for &(key, digit) in key_digit_mapping.iter() {
             if pressed_key == &key {
