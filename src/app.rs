@@ -6,6 +6,19 @@ use opengl_graphics::glyph_cache::GlyphCache;
 use field;
 use settings;
 
+lazy_static! {
+	static ref OVERLAY_TEXT: Vec<&'static str> = vec![
+		"Use mouse or arrow keys to select cells.",
+		"",
+		"Keys:",
+		"* **1-9** - fill in a digit",
+		"* **Backspace** - clear a cell",
+		"* **R** - generate new",
+		"* **S** - show solution",
+		"* **Esc** - exit",
+	];
+}
+
 struct Vec2f {
     x: f64,
     y: f64
@@ -16,7 +29,8 @@ pub struct App {
     mouse_coords: Vec2f,
     field: field::Field,
     selected_cell: Option<field::Coords>,
-    conflicting_cell: Option<field::Coords>
+    conflicting_cell: Option<field::Coords>,
+	show_overlay: bool,
 }
 
 impl App {
@@ -26,7 +40,8 @@ impl App {
             mouse_coords: Vec2f{ x: 0.0, y: 0.0 },
             field: field::Field::new(),
             selected_cell: None,
-            conflicting_cell: None
+            conflicting_cell: None,
+			show_overlay: false,
         }
     }
 
@@ -127,6 +142,19 @@ impl App {
                            self.settings.wind_size.x, thick / 2.0],
                            c.transform, g);
             }
+			
+			if self.show_overlay {
+				for (n, s) in OVERLAY_TEXT.iter().enumerate() {
+					let transform = c.transform.trans(
+						self.settings.overlay_offset.x,
+						self.settings.overlay_offset.y +
+						self.settings.overlay_text_interval * (n as f64));
+					let mut text = graphics::Text::new(self.settings.overlay_font_size);
+					text.color = [0.0, 0.0, 0.5, 0.8];
+					text.draw(s, cache,
+							  &c.draw_state, transform, g);
+				}
+			}
         });
     }
 
@@ -201,11 +229,8 @@ impl App {
                 None => self.selected_cell = Some(field::Coords{ x: 0, y: 0})
             }
         }
-        if pressed_key == &Key::Right {
-            match self.selected_cell {
-                Some(ref mut cell) => if cell.x < 8 { cell.x += 1; },
-                None => self.selected_cell = Some(field::Coords{ x: 0, y: 0})
-            }
+        if pressed_key == &Key::Tab {
+            self.show_overlay = !self.show_overlay;
         }
     }
 

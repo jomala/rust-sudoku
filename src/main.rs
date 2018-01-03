@@ -5,6 +5,8 @@ extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
 extern crate rand;
+#[macro_use]
+extern crate lazy_static;
 
 use piston::window::WindowSettings;
 use piston::input::*;
