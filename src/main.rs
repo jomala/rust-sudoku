@@ -20,13 +20,17 @@ mod app;
 mod field;
 mod settings;
 
+use settings::{Look, Vec2f};
+
 fn main() {
-    let settings = settings::Settings::new();
+    let look = Look::standard33();
 
     let opengl = OpenGL::V3_2;
+	let wind_cells_f: Vec2f = look.wind_cells.clone().into();
+	let wind_size_f = Vec2f { x: look.cell_size.x * wind_cells_f.x + look.thick_line_thickness,
+			                  y: look.cell_size.y * wind_cells_f.y + look.thick_line_thickness };
     let mut window: GlutinWindow =
-        WindowSettings::new("Sudoku",
-            [(settings.wind_size.x as u32), (settings.wind_size.y as u32)])
+        WindowSettings::new("Sudoku", [wind_size_f.x as u32, wind_size_f.y as u32])
         .exit_on_esc(true)
         .opengl(opengl)
         .build()
@@ -36,7 +40,7 @@ fn main() {
     let font_path = Path::new("assets/Verdana.ttf");
     let ref mut cache = GlyphCache::new(font_path).unwrap();
 
-    let mut app = app::App::new(settings);
+    let mut app = app::App::new(look);
 
     let mut events = Events::new(EventSettings::new());
     while let Some(e) = events.next(&mut window) {

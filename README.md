@@ -33,3 +33,6 @@ $ cargo build
 ```
 $ cargo run
 ```
+
+## Background
+* Forked from https://github.com/xairy/rust-sudoku
