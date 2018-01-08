@@ -13,7 +13,9 @@ lazy_static! {
 		"Keys:",
 		"* **1-9** - fill in a digit",
 		"* **Backspace** - clear a cell",
-		"* **R** - generate new",
+		"* **E** - edit mode",
+		"    * **C** - clear",
+		"    * **R** - generate new",
 		"* **S** - show solution",
 		"* **Esc** - exit",
 	];
@@ -26,6 +28,7 @@ pub struct App {
     selected_cell: Option<field::Coords>,
     conflicting_cell: Option<field::Coords>,
 	show_overlay: bool,
+	edit_mode: bool,
 }
 
 impl App {
@@ -37,6 +40,7 @@ impl App {
             selected_cell: None,
             conflicting_cell: None,
 			show_overlay: false,
+			edit_mode: false,
         }
     }
 
@@ -48,7 +52,7 @@ impl App {
 			
 			let grid_trans = c.transform.trans(
                             self.look.thick_line_thickness / 2.0,
-                            self.look.thick_line_thickness / 2.0);
+                            self.look.thick_line_thickness / 2.0 + self.look.message_height);
 
             let pointed_cell = field::Coords{
                 x: (self.mouse_coords.x / f64::from(self.look.cell_size.x))
@@ -127,12 +131,13 @@ impl App {
             }
 
 			let wind_cells_f: Vec2f = self.look.wind_cells.clone().into();
+			let line_color = if self.edit_mode {self.look.color_lines_edit} else {self.look.color_lines};
             for n in 0..(self.look.wind_cells.x + 1) {
                 let thick = match n % self.look.box_cells.x {
 					0 => self.look.thick_line_thickness,
 					_ => self.look.thin_line_thickness,
                 };
-                rectangle(self.look.color_lines,
+                rectangle(line_color,
                           [f64::from(n) * self.look.cell_size.x - thick / 2.0,
                            - thick / 2.0, 
 						   thick,
@@ -144,7 +149,7 @@ impl App {
 					0 => self.look.thick_line_thickness,
 					_ => self.look.thin_line_thickness,
                 };
-                rectangle(self.look.color_lines,
+                rectangle(line_color,
                           [- thick / 2.0, 
 						   f64::from(n) * self.look.cell_size.y - thick / 2.0,
 						   wind_cells_f.x * self.look.cell_size.x + thick,
@@ -152,12 +157,32 @@ impl App {
                            grid_trans, g);
             }
 			
+			if self.edit_mode {
+				let transform = grid_trans.trans(
+					self.look.message_offset.x,
+					self.look.message_offset.y);
+				let mut text = graphics::Text::new(self.look.message_font_size);
+				text.color = self.look.color_message;
+				let limit = 10;
+				let n = self.field.find_solutions(limit).len();
+				let s = if n == 0 {
+					"No solutions".to_string()
+				} else if n == 1 {
+					"One solution".to_string()
+				} else if n < limit as usize{
+					format!("{} solutions", n)
+				} else {
+					format!("{} or more solutions", n)
+				};
+				text.draw(s.as_str(), cache, &c.draw_state, transform, g);
+			}
+			
 			if self.show_overlay {
 				rectangle(self.look.color_overlay_back,
 						  [0.0,
 						  0.0,
-						  (self.look.wind_cells.x as f64) * self.look.cell_size.x + self.look.thick_line_thickness,
-						  (self.look.wind_cells.y as f64) * self.look.cell_size.y + self.look.thick_line_thickness],
+						  wind_cells_f.x * self.look.cell_size.x + self.look.thick_line_thickness,
+						  wind_cells_f.y * self.look.cell_size.y + self.look.thick_line_thickness],
 						  grid_trans, g);
 				for (n, s) in OVERLAY_TEXT.iter().enumerate() {
 					let transform = grid_trans.trans(
@@ -166,8 +191,7 @@ impl App {
 						self.look.overlay_text_interval * (n as f64));
 					let mut text = graphics::Text::new(self.look.overlay_font_size);
 					text.color = self.look.color_overlay;
-					text.draw(s, cache,
-							  &c.draw_state, transform, g);
+					text.draw(s, cache, &c.draw_state, transform, g);
 				}
 			}
         });
@@ -193,14 +217,14 @@ impl App {
         for &(key, digit) in key_digit_mapping.iter() {
             if pressed_key == &key {
                 if let Some(ref cell) = self.selected_cell {
-                    if !self.field.get_cell(cell.x, cell.y).fixed {
+                    if !self.field.get_cell(cell.x, cell.y).fixed || self.edit_mode {
                         match self.field.find_conflict(cell, digit) {
                             Some(coords) => {
                                 self.conflicting_cell = Some(coords);
                             },
                             None => {
-                                self.field.get_cell(cell.x, cell.y).digit =
-                                    Some(digit);
+                                self.field.get_cell(cell.x, cell.y).digit = Some(digit);
+                                self.field.get_cell(cell.x, cell.y).fixed = self.edit_mode;
                                 self.conflicting_cell = None;
                             }
                         }
@@ -210,8 +234,9 @@ impl App {
         }
         if pressed_key == &Key::Backspace {
             if let Some(ref cell) = self.selected_cell {
-                if !self.field.get_cell(cell.x, cell.y).fixed {
+                if !self.field.get_cell(cell.x, cell.y).fixed || self.edit_mode {
                     self.field.get_cell(cell.x, cell.y).digit = None;
+                    self.field.get_cell(cell.x, cell.y).fixed = false;
                     self.conflicting_cell = None;
                 }
             }
@@ -253,13 +278,27 @@ impl App {
         if pressed_key == &Key::Tab {
             self.show_overlay = !self.show_overlay;
         }
+        if pressed_key == &Key::E {
+            self.edit_mode = !self.edit_mode;
+        }
+        if pressed_key == &Key::C {
+            if self.edit_mode {
+				self.field.clear();
+			}
+        }
     }
 
     fn on_mouse_click(&mut self, button: &MouseButton) {
         if let &MouseButton::Left = button {
+			let mx = self.mouse_coords.x - self.look.thick_line_thickness / 2.0;
+            let my = self.mouse_coords.y - self.look.thick_line_thickness / 2.0 - self.look.message_height;
+			let mut cx = mx / self.look.cell_size.x;
+			if cx < 0.0 {cx = 0.0;} else if cx >= self.look.wind_cells.x as f64 {cx = self.look.wind_cells.x as f64 - 1.0;}
+			let mut cy = my / self.look.cell_size.y;
+			if cy < 0.0 {cy = 0.0;} else if cy >= self.look.wind_cells.y as f64 {cy = self.look.wind_cells.y as f64 - 1.0;}
             self.selected_cell = Some(field::Coords{
-                x: (self.mouse_coords.x / self.look.cell_size.x) as u8,
-                y: (self.mouse_coords.y / self.look.cell_size.y) as u8 });
+                x: cx as u8,
+                y: cy as u8 });
         }
     }
 

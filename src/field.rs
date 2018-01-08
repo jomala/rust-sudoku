@@ -86,8 +86,9 @@ impl Field {
 
         let solution = self.find_solution().unwrap();
         self.cells = solution.cells;
+		let mut fails = 100;
 
-        loop {
+        while fails > 0 {
             let mut x;
             let mut y;
             let digit;
@@ -108,8 +109,7 @@ impl Field {
                 continue;
             }
             self.get_cell(x, y).digit = Some(digit);
-
-            break;
+			fails -= 1;
         }
 
         // FIXME(xairy): generates perfect sudoku, but slow.
@@ -156,7 +156,7 @@ impl Field {
         None
     }
 
-    fn find_solutions(&mut self, stop_at: u32) -> Vec<Field> {
+    pub fn find_solutions(&mut self, stop_at: u32) -> Vec<Field> {
         let mut solutions = Vec::new();
         let mut field = self.clone();
         field.find_solutions_impl(&mut solutions, stop_at);
