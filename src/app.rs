@@ -163,17 +163,14 @@ impl App {
 					self.look.message_offset.y);
 				let mut text = graphics::Text::new(self.look.message_font_size);
 				text.color = self.look.color_message;
-				let limit = 10;
-				let n = self.field.find_solutions(limit).len();
-				let s = if n == 0 {
-					"No solutions".to_string()
-				} else if n == 1 {
-					"One solution".to_string()
-				} else if n < limit as usize{
-					format!("{} solutions", n)
-				} else {
-					format!("{} or more solutions", n)
-				};
+				let limit: u32 = 10;
+				let s = format!("{}, {}, {}",
+				                Self::num_to_text(self.field.find_solutions(limit).len(),
+												  "solution", "solutions", Some(limit as usize)),
+				                Self::num_to_text(self.field.count_empty() as usize,
+												  "empty cell", "empty cells", None),
+				                Self::num_to_text(self.field.count_options() as usize,
+												  "option", "options", None));
 				text.draw(s.as_str(), cache, &c.draw_state, transform, g);
 			}
 			
@@ -196,6 +193,18 @@ impl App {
 			}
         });
     }
+	
+	fn num_to_text(n: usize, sing: &str, plur: &str, limit: Option<usize>) -> String {
+		if n == 0 {
+			format!("No {}", plur)
+		} else if n == 1 {
+			format!("One {}", sing)
+		} else if limit.is_none() || n < (limit.unwrap() as usize) {
+			format!("{} {}", n, plur)
+		} else {
+			format!("{} or more {}", limit.unwrap(), plur)
+		}
+	}
 
     pub fn on_button_press(&mut self, button: &Button) {
         match button {

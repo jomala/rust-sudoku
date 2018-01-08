@@ -26,6 +26,35 @@ impl Field {
         field
     }
 
+	pub fn count_empty(&self) -> u32 {
+		let mut count = 0;
+		for x in 0..9 {
+			for y in 0..9 {
+				if self.cells[y as usize][x as usize].digit.is_none() {
+					count += 1;
+				}
+			}
+		}
+		count
+	}
+	
+	pub fn count_options(&self) -> u32 {
+		let mut temp = self.clone();
+		let mut count = 0;
+		for x in 0..9 {
+			for y in 0..9 {
+				if temp.cells[y as usize][x as usize].digit.is_none() {
+					for n in 0..9 {
+						if temp.find_conflict(&Coords{ x, y }, n).is_none()  {
+							count += 1;						
+						}
+					}
+				}
+			}
+		}
+		count
+	}
+	
     pub fn get_cell(&mut self, x: u8, y: u8) -> &mut Cell {
         &mut self.cells[y as usize][x as usize]
     }
