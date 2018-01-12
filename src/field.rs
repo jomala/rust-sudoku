@@ -1,6 +1,9 @@
 use rand;
 use rand::Rng;
+use std::iter::Iterator;
+use std::rc::Rc;
 
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Coords {
     pub x: u8,
     pub y: u8
@@ -12,17 +15,78 @@ pub struct Cell {
     pub fixed: bool
 }
 
-#[derive(Copy, Clone)]
+pub enum Neighbour {
+	In,
+	Out,
+	OutOfBounds,
+}
+
+#[derive(Clone)]
+pub struct Region {
+	pub cells: Vec<Coords>,
+	pub sum: u32,
+}
+
+impl Region {
+	pub fn new(loc: Coords, sum: u32) -> Region {
+		let mut vec = Vec::new();
+		vec.push(loc);
+		Region { cells: vec, sum: sum }
+	}
+	
+	pub fn join(mut self, mut other: Region) -> Region {
+		self.cells.append(&mut other.cells);
+		Region { cells: self.cells, sum: self.sum + other.sum }
+	}
+	
+	pub fn includes(&self, loc: &Coords) -> bool {
+		self.cells.iter().find(|&x| x == loc).is_some()
+	}
+	
+	pub fn is_neighbour(&self, loc: &Coords) -> bool {
+        !self.includes(&loc) &&
+		((loc.x > 0 && self.includes(&Coords { x: loc.x-1, y: loc.y })) ||
+		 (loc.y > 0 && self.includes(&Coords { x: loc.x, y: loc.y-1 })) ||
+		 (loc.x < 8 && self.includes(&Coords { x: loc.x+1, y: loc.y })) ||
+		 (loc.y < 8 && self.includes(&Coords { x: loc.x, y: loc.y+1 })))
+	}
+	
+	pub fn neighbours(&self) -> Vec<Coords> {
+		let mut vec = Vec::new();
+		for x in 0..9 {
+			for y in 0..9 {
+				let coords = Coords { x, y };
+				if self.is_neighbour(&coords) {
+					vec.push(coords);
+				}
+			}
+		}
+		vec		
+	}
+}
+
+#[derive(Clone)]
 pub struct Field {
-    pub cells: [[Cell; 9]; 9]
+    pub cells: [[Cell; 9]; 9],
+	pub regions: Rc<Vec<Region>>,
 }
 
 impl Field {
     pub fn new() -> Field {
         let mut field = Field {
-            cells: [[Cell{ digit: None, fixed: false }; 9]; 9]
+            cells: [[Cell{ digit: None, fixed: false }; 9]; 9],
+			regions: Rc::new(Vec::new()),
         };
         field.fill_random();
+        field
+    }
+
+    pub fn new_with_regions() -> Field {
+        let mut field = Field {
+            cells: [[Cell{ digit: None, fixed: false }; 9]; 9],
+			regions: Rc::new(Vec::new()),
+        };
+        field.fill_random_regions();
         field
     }
 
@@ -58,6 +122,10 @@ impl Field {
     pub fn get_cell(&mut self, x: u8, y: u8) -> &mut Cell {
         &mut self.cells[y as usize][x as usize]
     }
+	
+	pub fn get_region(&self, loc: &Coords) -> Option<(usize, &Region)> {
+		(*self.regions).iter().enumerate().find(|&x| x.1.includes(loc))
+	}
 
     pub fn find_conflict(&mut self, coords: &Coords,
                           digit: u8) -> Option<Coords> {
@@ -112,10 +180,10 @@ impl Field {
         let y = rand::thread_rng().gen_range(0u8, 9u8);
         let digit = rand::thread_rng().gen_range(1u8, 10u8);
         self.get_cell(x, y).digit = Some(digit);
-
         let solution = self.find_solution().unwrap();
+		
         self.cells = solution.cells;
-		let mut fails = 100;
+		let mut fails = 20;
 
         while fails > 0 {
             let mut x;
@@ -140,34 +208,69 @@ impl Field {
             self.get_cell(x, y).digit = Some(digit);
 			fails -= 1;
         }
+    }
 
-        // FIXME(xairy): generates perfect sudoku, but slow.
-        /*
-        let mut cells = Vec::new();
-        for y in 0..9 {
-            for x in 0..9 {
-                cells.push((x, y));
-            }
-        }
-        rand::thread_rng().shuffle(&mut cells);
+    pub fn fill_random_regions(&mut self) {
+        self.clear();
 
-        for &(x, y) in cells.iter() {
-            let digit = self.get_cell(x, y).digit.unwrap();
-            self.get_cell(x, y).digit = None;
+        let x = rand::thread_rng().gen_range(0u8, 9u8);
+        let y = rand::thread_rng().gen_range(0u8, 9u8);
+        let digit = rand::thread_rng().gen_range(1u8, 10u8);
+        self.get_cell(x, y).digit = Some(digit);
+        let mut solution = self.find_solution().unwrap();
+        self.clear();
+		
+		{
+			let region_list = Rc::get_mut(&mut self.regions).expect("Region found");
+			for y in 0..9 {
+				for x in 0..9 {
+					let sum = solution.get_cell(x, y).digit.unwrap() as u32;
+					let reg = Region::new(Coords { x, y }, sum);
+					region_list.push(reg);
+				}
+			}
+		}
+
+		let mut fails = 100;
+
+        while fails > 0 {
+			let region;
+			let region2;
+			{
+				assert!(self.regions.len() > 1);
+				let r_idx = {
+					let x = rand::thread_rng().gen_range(0u8, 9u8);
+					let y = rand::thread_rng().gen_range(0u8, 9u8);
+					let loc = Coords { x, y };
+					self.get_region(&loc).expect("All cells in a region").0
+				};
+				region = Rc::get_mut(&mut self.regions).expect("Region found").swap_remove(r_idx);
+				
+				let n_list = region.neighbours();
+				assert!(n_list.len() > 0);
+				let n_idx = rand::thread_rng().gen_range(0, n_list.len());
+				let n = n_list[n_idx];
+				
+				let (r2_idx, _) = self.get_region(&n).expect("All neighbours in another region");
+				let region_list = Rc::get_mut(&mut self.regions).expect("Region found");
+				region2 = region_list.swap_remove(r2_idx);
+				
+				let region_comb = region.clone().join(region2.clone());
+				region_list.push(region_comb);
+			}
+			
             let solutions = self.find_solutions(2);
-            if solutions.len() > 1 {
-                self.get_cell(x, y).digit = Some(digit);
+            if solutions.len() == 1 {
+                continue;
             }
-        }
-        */
-
-
-        for y in 0..9 {
-            for x in 0..9 {
-                if self.get_cell(x, y).digit.is_some() {
-                    self.get_cell(x, y).fixed = true;
-                }
-            }
+			
+			{
+				let region_list = Rc::get_mut(&mut self.regions).expect("Region found");
+				region_list.pop();
+				region_list.push(region);
+				region_list.push(region2);
+			}
+			fails -= 1;
         }
     }
 
@@ -180,7 +283,7 @@ impl Field {
     pub fn find_solution(&mut self) -> Option<Field> {
         let solutions = self.find_solutions(1);
         if solutions.len() > 0 {
-            return Some(solutions[0]);
+            return Some(solutions[0].clone());
         }
         None
     }
@@ -225,4 +328,15 @@ impl Field {
 
         false
     }
+}
+
+#[test]
+pub fn test_regions() {
+	let field = Field::new_with_regions();
+	for i in (*field.regions).iter() {
+		print!("Region: sum {}", i.sum);
+		for _j in i.cells.iter() {
+			print!("Cell");
+		}
+	}
 }
