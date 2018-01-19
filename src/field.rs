@@ -82,12 +82,15 @@ impl Regions {
 	}
 	
 	pub fn remove(&mut self, loc: Coords, val: u32) -> RegionId {
-		let reg_id = {
-			self.id(&loc)
-		};
-		let count = {
-			self.count_region(reg_id)
-		};
+		let reg_id;
+		{
+			reg_id = {
+				self.id(&loc)
+			};
+			let count = {
+				self.count_region(reg_id)
+			};
+		}
 		
 		{
 			let sum: &mut u32 = self.sums.get_mut(&reg_id).unwrap();
