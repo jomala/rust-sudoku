@@ -3,9 +3,9 @@ use rand::Rng;
 use std::iter::Iterator;
 use std::rc::Rc;
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter, Result as FmtResult};
+use std::fmt::{Display, Debug, Formatter, Result as FmtResult};
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct Coords {
     pub x: u8,
     pub y: u8
@@ -17,7 +17,7 @@ impl Display for Coords {
 	}
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Cell {
     pub digit: Option<u8>,
     pub fixed: bool
@@ -46,6 +46,12 @@ impl Display for RegionId {
 	}
 }
 
+impl Debug for RegionId {
+	fn fmt(&self, f: &mut Formatter) -> FmtResult {
+		write!(f, "Region({})", self.0)
+	}
+}
+
 #[derive(Clone)]
 pub struct Regions {
 	pub sums: HashMap<RegionId, u32>,
@@ -53,12 +59,43 @@ pub struct Regions {
 	pub next_id: RegionId,
 }
 
+impl Display for Regions {
+	fn fmt(&self, f: &mut Formatter) -> FmtResult {
+		write!(f, "Sums:\n{:?}\n", self.sums)?;
+		write!(f, "Regions:\n")?;
+		for y in 0..9 {
+			for x in 0..9 {
+				let reg = self.cells[y as usize][x as usize].0;
+				write!(f, "{:>3} ", reg)?;
+			}
+			write!(f, "\n")?;
+		}
+		write!(f, "\n")
+	}
+}
+
 impl Regions {
+	pub fn none() -> Regions {
+		let sums = HashMap::new();
+		let cells = [[RegionId(0); 9]; 9];
+		let row_reg_id = RegionId(0);
+		let regions = Regions { sums: sums, cells: cells, next_id: row_reg_id };
+		regions
+	}
+	
 	pub fn new() -> Regions {
 		let mut sums = HashMap::new();
-		let whole_sum = 45 * 9;
-		sums.insert(RegionId(0), whole_sum);
-		Regions { sums: HashMap::new(), cells: [[RegionId(0); 9]; 9], next_id: RegionId(1) }
+		let mut cells = [[RegionId(0); 9]; 9];
+		let mut row_reg_id = RegionId(0);
+		for y in 0..9 {
+			sums.insert(row_reg_id, 45);
+			for x in 0..9 {
+				cells[y as usize][x as usize] = row_reg_id;
+			}
+			row_reg_id = row_reg_id.incr();
+		}
+		let regions = Regions { sums: sums, cells: cells, next_id: row_reg_id };
+		regions
 	}
 	
 	pub fn join(&mut self, reg_id_a: RegionId, reg_id_b: RegionId) -> RegionId {
@@ -69,10 +106,10 @@ impl Regions {
 		let reg_b_sum = self.sums.remove(&reg_id_b).expect("Id not found");
 		self.sums.insert(reg_id_sum, reg_a_sum + reg_b_sum);
 		
-		for x in 0..9 {
-			for y in 0..9 {
+		for y in 0..9 {
+			for x in 0..9 {
 				let id = self.cells[y as usize][x as usize];
-				if id == reg_id_a || id == reg_id_a {
+				if id == reg_id_a || id == reg_id_b {
 					self.cells[y as usize][x as usize] = reg_id_sum;
 				}
 			}
@@ -82,30 +119,24 @@ impl Regions {
 	}
 	
 	pub fn remove(&mut self, loc: Coords, val: u32) -> RegionId {
-		let reg_id;
+		let reg_id = self.id(&loc);
+		let count  = {self.count_region(reg_id)};
 		{
-			reg_id = {
-				self.id(&loc)
-			};
-			let count = {
-				self.count_region(reg_id)
-			};
-		}
-		
-		{
-			let sum: &mut u32 = self.sums.get_mut(&reg_id).unwrap();
+			assert_eq!(self.sums.contains_key(&reg_id), true);
+			let sum = self.sums.get_mut(&reg_id).unwrap();
 			assert!(*sum >= val);
 			if *sum == val {
 				assert!(count == 1);
 				return reg_id;
 			}
 			assert!(count > 1);
-						*sum -= val;
+			*sum -= val;
 		}
 		
 		let new_reg_id = self.next_id;
 		self.next_id = self.next_id.incr();
-		*self.sums.get_mut(&new_reg_id).unwrap() = val;
+		
+		self.sums.insert(new_reg_id.clone(), val);
 		self.cells[loc.y as usize][loc.x as usize] = new_reg_id;
 		
 		new_reg_id
@@ -125,8 +156,8 @@ impl Regions {
 	
 	pub fn count_region(&self, reg_id: RegionId) -> u32 {
 		let mut count = 0;
-		for x in 0..9 {
-			for y in 0..9 {
+		for y in 0..9 {
+			for x in 0..9 {
 				if self.id(&Coords { x, y }) == reg_id {
 					count += 1;
 				}
@@ -137,8 +168,8 @@ impl Regions {
 
 	pub fn neighbours(&self, reg_id: RegionId) -> Vec<Coords> {
 		let mut vec = Vec::new();
-		for x in 0..9 {
-			for y in 0..9 {
+		for y in 0..9 {
+			for x in 0..9 {
 				let coords = Coords { x, y };
 				if self.is_neighbour(reg_id, &coords) {
 					vec.push(coords);
@@ -153,6 +184,30 @@ impl Regions {
 		let idx = rand::thread_rng().gen_range(0, vec.len());
 		vec[idx]
 	}
+	
+	fn can_regions_join(&self, reg_id_a: RegionId, reg_id_b: RegionId, solution: &[[Cell; 9]; 9]) -> bool {
+		let mut check = [false; 9];
+		
+		for y in 0..9 {
+			for x in 0..9 {
+				let c = Coords{ x, y};
+				if self.id(&c) == reg_id_a || self.id(&c) == reg_id_b {
+					match solution[y as usize][x as usize].digit {
+						Some(v) => {
+							if check[v as usize - 1] {
+								return false; 
+							}
+							check[v as usize - 1] = true;
+						}
+						None => {
+							assert!(false);
+						}
+					}
+				}
+			}
+		}
+        true
+	}
 }
 
 #[derive(Clone)]
@@ -161,16 +216,34 @@ pub struct Field {
 	pub regions: Rc<Regions>,
 }
 
+impl Display for Field {
+	fn fmt(&self, f: &mut Formatter) -> FmtResult {
+		write!(f, "Cells:\n")?;
+		for y in 0..9 {
+			for x in 0..9 {
+				match self.cells[y as usize][x as usize].digit {
+					Some(d) => write!(f, "{}", d)?,
+					None => write!(f, " ")?,
+				};
+			}
+			write!(f, "\n")?;
+		}
+
+		write!(f, "Regions:\n{}\n", *(self.regions))
+	}
+}
+
 impl Field {
     pub fn new() -> Field {
         let mut field = Field {
             cells: [[Cell{ digit: None, fixed: false }; 9]; 9],
-			regions: Rc::new(Regions::new()),
+			regions: Rc::new(Regions::none()),
         };
         field.fill_random();
         field
     }
 
+	#[allow(dead_code)]
     pub fn new_with_regions() -> Field {
         let mut field = Field {
             cells: [[Cell{ digit: None, fixed: false }; 9]; 9],
@@ -182,8 +255,8 @@ impl Field {
 
 	pub fn count_empty(&self) -> u32 {
 		let mut count = 0;
-		for x in 0..9 {
-			for y in 0..9 {
+		for y in 0..9 {
+			for x in 0..9 {
 				if self.cells[y as usize][x as usize].digit.is_none() {
 					count += 1;
 				}
@@ -195,8 +268,8 @@ impl Field {
 	pub fn count_options(&self) -> u32 {
 		let mut temp = self.clone();
 		let mut count = 0;
-		for x in 0..9 {
-			for y in 0..9 {
+		for y in 0..9 {
+			for x in 0..9 {
 				if temp.cells[y as usize][x as usize].digit.is_none() {
 					for n in 0..9 {
 						if temp.find_conflict(&Coords{ x, y }, n).is_none()  {
@@ -215,10 +288,12 @@ impl Field {
 	
     pub fn find_conflict(&mut self, coords: &Coords,
                           digit: u8) -> Option<Coords> {
+		// print!("Check {} as {}\n", coords, digit);
         for x in 0..9 {
             if x != coords.x {
                 if let Some(cell_digit) = self.get_cell(x, coords.y).digit {
                     if cell_digit == digit {
+						// print!("In row, found match at col {}\n", x);
                         return Some(Coords{ x: x, y: coords.y});
                     }
                 }
@@ -229,6 +304,7 @@ impl Field {
             if y != coords.y {
                 if let Some(cell_digit) = self.get_cell(coords.x, y).digit {
                     if cell_digit == digit {
+						// print!("In col, found match at row {}\n", y);
                         return Some(Coords{ x: coords.x, y: y});
                     }
                 }
@@ -241,20 +317,75 @@ impl Field {
                 if x != coords.x || y != coords.y {
                     if let Some(cell_digit) = self.get_cell(x, y).digit {
                         if cell_digit == digit {
+							// print!("In box, found match at ({}, {})\n", x, y);
                             return Some(Coords{ x: x, y: y});
                         }
                     }
                 }
             }
         }
-
-        None
+		
+		let reg_id = self.regions.id(coords);
+		match self.find_region_conflict(coords, digit, reg_id) {
+			Some(clash) => { return Some(clash); }
+			None => {}
+		}
+		
+		None
     }
 
+    fn find_region_conflict(&mut self, coords: &Coords,
+                            digit: u8, reg_id: RegionId)
+							-> Option<Coords> {
+		if self.regions.sums.len() == 0 { return None }
+		let reg_sum = self.regions.sums[&reg_id];
+		let mut sum: u32 = 0;
+		let mut blank = 0;
+		let mut last = Some(*coords);
+		for y in 0..9 {
+			for x in 0..9 {
+				let c = Coords{ x, y};
+				if c == *coords {
+					//print!("Found self\n");
+					sum += digit as u32;
+				} else if self.regions.id(&c) == reg_id {
+					last = Some(c);
+					match self.cells[y as usize][x as usize].digit {
+						Some(v) => {
+							if v == digit {
+								return last; 
+							}
+							sum += v as u32;
+						}
+						None => blank += 1,
+					}
+				}
+			}
+		}
+		// print!("No same digit fail\n");
+		if sum > reg_sum {return last}
+		if sum == reg_sum && blank > 0 {return last}
+		if sum < reg_sum && blank == 0 {return last}
+		
+		// print("No conflict\n");
+        None
+	}
+	
     pub fn clear(&mut self) {
         for y in 0..9 {
             for x in 0..9 {
-                self.cells[x][y] = Cell{ digit: None, fixed: false };
+                self.cells[y][x] = Cell{ digit: None, fixed: false };
+            }
+        }
+		self.regions = Rc::new(Regions::new());
+    }
+	
+    pub fn restart(&mut self) {
+        for y in 0..9 {
+            for x in 0..9 {
+				if !self.cells[y][x].fixed {
+					self.cells[y][x] = Cell{ digit: None, fixed: false };
+				}
             }
         }
     }
@@ -323,37 +454,61 @@ impl Field {
 				}
 			}
 		}
+		
+		{
+			print!("Start\n{}\n", self);
+			let solutions = self.find_solutions(3);
+			assert!(solutions.len() == 1);
+		}
+		
+		let mut fails = 3;
 
-		let mut fails = 100;
-
-        while fails > 0 {
-			// Save the state
-			let regions_copy: Regions = (*self.regions).clone();
-			
-			// Pick a region
-			assert!(self.regions.sums.len() > 1);
-			let r_idx = {
-				let x = rand::thread_rng().gen_range(0u8, 9u8);
-				let y = rand::thread_rng().gen_range(0u8, 9u8);
-				let loc = Coords { x, y };
-				self.regions.id(&loc)
-			};
-			
-			// Pick a random neighbouring region
-			let n_idx = self.regions.id(&(self.regions).random_neighbour(r_idx));
-			
-			// Attempt to join the regions
-			Rc::get_mut(&mut self.regions).unwrap().join(r_idx, n_idx);
+        'outer2: while fails > 0 {
+			let regions_copy = {(*self.regions).clone()};
+			{
+				// Get the regions
+				let reg_mut = Rc::get_mut(&mut self.regions).unwrap();
+				let mut n_idx;
+				let mut r_idx;
+				
+				while {
+					// Pick a region
+					assert!(reg_mut.sums.len() > 1);
+					r_idx = {
+						let x = rand::thread_rng().gen_range(0u8, 9u8);
+						let y = rand::thread_rng().gen_range(0u8, 9u8);
+						let loc = Coords { x, y };
+						reg_mut.id(&loc)
+					};
+					
+					// Pick a random neighbouring region
+					n_idx = reg_mut.id(&reg_mut.random_neighbour(r_idx));
+					
+					!reg_mut.can_regions_join(r_idx, n_idx, &solution_cells)
+				}
+				{
+					fails -= 1;
+					if fails <= 0 {
+						break 'outer2;
+					}
+				}
+				// Attempt to join the regions
+				let new_idx = reg_mut.join(r_idx, n_idx);
+				print!("Trying {} + {} => {}", r_idx, n_idx, new_idx);
+			}
 			
 			// See if there's still only one solution
-            let solutions = self.find_solutions(2);
-			assert!(solutions.len() > 0);
+            let solutions = self.find_solutions(3);
+			// Might be zero if regions are too big
+			// assert!(solutions.len() > 0);
 			
             if solutions.len() == 1 {
+				print!("One solution\n");
                 continue;
             }
 			
 			// If not, revert and try again
+			print!("{} solutions\n", solutions.len());
 			self.regions = Rc::new(regions_copy);
 			fails -= 1;
         }
@@ -393,6 +548,7 @@ impl Field {
         }
 
         if empty_cell.is_none() {
+			// print!("Potential solution:\n{}\n", self);
             solutions.push(self.clone());
             return solutions.len() >= (stop_at as usize);
         }
@@ -416,9 +572,13 @@ impl Field {
 }
 
 #[test]
+pub fn test_without_regions() {
+	let field = Field::new();
+	print!("Random Field:\n{}", field);
+}
+
+#[test]
 pub fn test_regions() {
 	let field = Field::new_with_regions();
-	for (id, sum) in (*field.regions).sums.iter() {
-		print!("Region {}: sum {}", id, sum);
-	}
+	print!("Random Field:\n{}", field);
 }

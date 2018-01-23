@@ -98,7 +98,7 @@ impl App {
                     }
                 }
             }
-
+			
             if let Some(ref cell) = self.conflicting_cell {
                 rectangle(self.look.color_conflicting,
                           [(cell.x as f64) * self.look.cell_size.x,
@@ -115,6 +115,59 @@ impl App {
                           grid_trans, g);
             }
 
+            for y in 0..9 {
+                for x in 0..10 {
+					if x == 0 {
+                        rectangle(self.look.color_lines_region,
+                            [(x as f64) * self.look.cell_size.x,
+                             (y as f64) * self.look.cell_size.y,
+                             self.look.region_line_thickness / 2.0,
+                             self.look.cell_size.y],
+                            grid_trans, g);
+					} else if x == 9 {
+                        rectangle(self.look.color_lines_region,
+                            [(x as f64) * self.look.cell_size.x - self.look.region_line_thickness / 2.0,
+                             (y as f64) * self.look.cell_size.y,
+                             self.look.region_line_thickness / 2.0,
+                             self.look.cell_size.y],
+                            grid_trans, g);
+					} else if self.field.regions.cells[y][x] != self.field.regions.cells[y][x-1] {
+                        rectangle(self.look.color_lines_region,
+                            [(x as f64) * self.look.cell_size.x - self.look.region_line_thickness / 2.0,
+                             (y as f64) * self.look.cell_size.y,
+                             self.look.region_line_thickness,
+                             self.look.cell_size.y],
+                            grid_trans, g);
+					}
+                }
+            }
+            for x in 0..9 {
+                for y in 0..10 {
+					if y == 0 {
+                        rectangle(self.look.color_lines_region,
+                            [(x as f64) * self.look.cell_size.x,
+                             (y as f64) * self.look.cell_size.y,
+                             self.look.cell_size.x,
+                             self.look.region_line_thickness / 2.0],
+                            grid_trans, g);
+					} else if y == 9 {
+                        rectangle(self.look.color_lines_region,
+                            [(x as f64) * self.look.cell_size.x,
+                             (y as f64) * self.look.cell_size.y - self.look.region_line_thickness / 2.0,
+                             self.look.cell_size.x,
+                             self.look.region_line_thickness / 2.0],
+                            grid_trans, g);
+					} else if self.field.regions.cells[y][x] != self.field.regions.cells[y-1][x] {
+                        rectangle(self.look.color_lines_region,
+                            [(x as f64) * self.look.cell_size.x,
+                             (y as f64) * self.look.cell_size.y - self.look.region_line_thickness / 2.0,
+                             self.look.cell_size.x,
+                             self.look.region_line_thickness],
+                            grid_trans, g);
+					}
+                }
+            }
+			
             for y in 0..9 {
                 for x in 0..9 {
                     if let Some(ref digit) = self.field.cells[y][x].digit {
@@ -206,10 +259,10 @@ impl App {
 		}
 	}
 
-    pub fn on_button_press(&mut self, button: &Button) {
+    pub fn on_button_press(&mut self, button: &Button, mod_key: &keyboard::ModifierKey) {
         match button {
             &Button::Keyboard(key) => {
-                self.on_key_down(&key);
+                self.on_key_down(&key, &mod_key);
             },
             &Button::Mouse(button) => {
                 self.on_mouse_click(&button);
@@ -218,7 +271,7 @@ impl App {
         }
     }
 
-    fn on_key_down(&mut self, pressed_key: &Key) {
+    fn on_key_down(&mut self, pressed_key: &Key, mod_key: &keyboard::ModifierKey) {
         let key_digit_mapping = [
             (Key::D1, 1), (Key::D2, 2), (Key::D3, 3),
             (Key::D4, 4), (Key::D5, 5), (Key::D6, 6),
@@ -250,16 +303,6 @@ impl App {
                 }
             }
         }
-        if pressed_key == &Key::S {
-            self.field.fill_solution();
-            self.conflicting_cell = None;
-            self.selected_cell = None;
-        }
-        if pressed_key == &Key::R {
-            self.field.fill_random();
-            self.conflicting_cell = None;
-            self.selected_cell = None;
-        }
         if pressed_key == &Key::Up {
             match self.selected_cell {
                 Some(ref mut cell) => if cell.y > 0 { cell.y -= 1; },
@@ -284,15 +327,33 @@ impl App {
                 None => self.selected_cell = Some(field::Coords{ x: 0, y: 0})
             }
         }
+        if pressed_key == &Key::S {
+            self.field.fill_solution();
+            self.conflicting_cell = None;
+            self.selected_cell = None;
+        }
+        if pressed_key == &Key::N  && (mod_key.contains(keyboard::CTRL)) && !(mod_key.contains(keyboard::SHIFT)) {
+            self.field = field::Field::new();
+            self.conflicting_cell = None;
+            self.selected_cell = None;
+        }
+        if pressed_key == &Key::N  && (mod_key.contains(keyboard::CTRL_SHIFT)) {
+            self.field = field::Field::new_with_regions();
+            self.conflicting_cell = None;
+            self.selected_cell = None;
+        }
         if pressed_key == &Key::Tab {
             self.show_overlay = !self.show_overlay;
         }
-        if pressed_key == &Key::E {
+        if (pressed_key == &Key::E) && (mod_key.contains(keyboard::CTRL)) {
             self.edit_mode = !self.edit_mode;
         }
         if pressed_key == &Key::C {
             if self.edit_mode {
 				self.field.clear();
+			}
+			else {
+				self.field.restart();
 			}
         }
     }

@@ -41,6 +41,7 @@ fn main() {
     let ref mut cache = GlyphCache::new(font_path).unwrap();
 
     let mut app = app::App::new(look);
+	let mut modifier_key: keyboard::ModifierKey = Default::default();
 
     let mut events = Events::new(EventSettings::new());
     while let Some(e) = events.next(&mut window) {
@@ -49,7 +50,8 @@ fn main() {
         }
 
         if let Some(button) = e.press_args() {
-            app.on_button_press(&button);
+			modifier_key.event(&e);
+            app.on_button_press(&button, &modifier_key);
         }
 
         if let Some(args) = e.mouse_cursor_args() {
