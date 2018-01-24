@@ -363,9 +363,11 @@ impl Field {
 			}
 		}
 		// print!("No same digit fail\n");
-		if sum > reg_sum {return last}
-		if sum == reg_sum && blank > 0 {return last}
-		if sum < reg_sum && blank == 0 {return last}
+		// if sum > reg_sum {return last}
+		// if sum == reg_sum && blank > 0 {return last}
+		// if sum < reg_sum && blank == 0 {return last}
+		if sum + (blank * (blank + 1) / 2) > reg_sum {return last}
+		if sum + (blank * (19 - blank) / 2) < reg_sum {return last}
 		
 		// print("No conflict\n");
         None

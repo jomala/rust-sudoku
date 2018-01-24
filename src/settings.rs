@@ -79,7 +79,7 @@ impl Look {
 			color_selected: [0.8, 0.9, 0.8, 1.0],
 			color_lines: [0.0, 0.0, 0.0, 1.0],
 			color_lines_edit: [1.0, 0.0, 0.0, 1.0],
-			color_lines_region: [1.0, 0.5, 0.5, 1.0],
+			color_lines_region: [0.5, 0.5, 1.0, 1.0],
 			color_overlay: [0.0, 0.0, 0.5, 1.0],
 			color_overlay_back: [1.0, 1.0, 1.0, 0.5],
 			color_message: [1.0, 0.0, 0.0, 1.0],

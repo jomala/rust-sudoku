@@ -114,59 +114,61 @@ impl App {
                            self.look.cell_size.x, self.look.cell_size.y],
                           grid_trans, g);
             }
-
-            for y in 0..9 {
-                for x in 0..10 {
-					if x == 0 {
-                        rectangle(self.look.color_lines_region,
-                            [(x as f64) * self.look.cell_size.x,
-                             (y as f64) * self.look.cell_size.y,
-                             self.look.region_line_thickness / 2.0,
-                             self.look.cell_size.y],
-                            grid_trans, g);
-					} else if x == 9 {
-                        rectangle(self.look.color_lines_region,
-                            [(x as f64) * self.look.cell_size.x - self.look.region_line_thickness / 2.0,
-                             (y as f64) * self.look.cell_size.y,
-                             self.look.region_line_thickness / 2.0,
-                             self.look.cell_size.y],
-                            grid_trans, g);
-					} else if self.field.regions.cells[y][x] != self.field.regions.cells[y][x-1] {
-                        rectangle(self.look.color_lines_region,
-                            [(x as f64) * self.look.cell_size.x - self.look.region_line_thickness / 2.0,
-                             (y as f64) * self.look.cell_size.y,
-                             self.look.region_line_thickness,
-                             self.look.cell_size.y],
-                            grid_trans, g);
+			
+			if self.field.regions.sums.len() > 0 {
+				for y in 0..9 {
+					for x in 0..10 {
+						if x == 0 {
+							rectangle(self.look.color_lines_region,
+								[(x as f64) * self.look.cell_size.x,
+								 (y as f64) * self.look.cell_size.y,
+								 self.look.region_line_thickness / 2.0,
+								 self.look.cell_size.y],
+								grid_trans, g);
+						} else if x == 9 {
+							rectangle(self.look.color_lines_region,
+								[(x as f64) * self.look.cell_size.x - self.look.region_line_thickness / 2.0,
+								 (y as f64) * self.look.cell_size.y,
+								 self.look.region_line_thickness / 2.0,
+								 self.look.cell_size.y],
+								grid_trans, g);
+						} else if self.field.regions.cells[y][x] != self.field.regions.cells[y][x-1] {
+							rectangle(self.look.color_lines_region,
+								[(x as f64) * self.look.cell_size.x - self.look.region_line_thickness / 2.0,
+								 (y as f64) * self.look.cell_size.y,
+								 self.look.region_line_thickness,
+								 self.look.cell_size.y],
+								grid_trans, g);
+						}
 					}
-                }
-            }
-            for x in 0..9 {
-                for y in 0..10 {
-					if y == 0 {
-                        rectangle(self.look.color_lines_region,
-                            [(x as f64) * self.look.cell_size.x,
-                             (y as f64) * self.look.cell_size.y,
-                             self.look.cell_size.x,
-                             self.look.region_line_thickness / 2.0],
-                            grid_trans, g);
-					} else if y == 9 {
-                        rectangle(self.look.color_lines_region,
-                            [(x as f64) * self.look.cell_size.x,
-                             (y as f64) * self.look.cell_size.y - self.look.region_line_thickness / 2.0,
-                             self.look.cell_size.x,
-                             self.look.region_line_thickness / 2.0],
-                            grid_trans, g);
-					} else if self.field.regions.cells[y][x] != self.field.regions.cells[y-1][x] {
-                        rectangle(self.look.color_lines_region,
-                            [(x as f64) * self.look.cell_size.x,
-                             (y as f64) * self.look.cell_size.y - self.look.region_line_thickness / 2.0,
-                             self.look.cell_size.x,
-                             self.look.region_line_thickness],
-                            grid_trans, g);
+				}
+				for x in 0..9 {
+					for y in 0..10 {
+						if y == 0 {
+							rectangle(self.look.color_lines_region,
+								[(x as f64) * self.look.cell_size.x,
+								 (y as f64) * self.look.cell_size.y,
+								 self.look.cell_size.x,
+								 self.look.region_line_thickness / 2.0],
+								grid_trans, g);
+						} else if y == 9 {
+							rectangle(self.look.color_lines_region,
+								[(x as f64) * self.look.cell_size.x,
+								 (y as f64) * self.look.cell_size.y - self.look.region_line_thickness / 2.0,
+								 self.look.cell_size.x,
+								 self.look.region_line_thickness / 2.0],
+								grid_trans, g);
+						} else if self.field.regions.cells[y][x] != self.field.regions.cells[y-1][x] {
+							rectangle(self.look.color_lines_region,
+								[(x as f64) * self.look.cell_size.x,
+								 (y as f64) * self.look.cell_size.y - self.look.region_line_thickness / 2.0,
+								 self.look.cell_size.x,
+								 self.look.region_line_thickness],
+								grid_trans, g);
+						}
 					}
-                }
-            }
+				}
+			}
 			
             for y in 0..9 {
                 for x in 0..9 {
