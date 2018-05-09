@@ -463,9 +463,11 @@ impl Field {
 			assert!(solutions.len() == 1);
 		}
 		
-		let mut fails = 3;
+		let mut fails = 30;
+		let mut successes = 0;
 
         'outer2: while fails > 0 {
+			assert_eq!(self.regions.sums.len(), 81 - successes);
 			let regions_copy = {(*self.regions).clone()};
 			{
 				// Get the regions
@@ -489,6 +491,7 @@ impl Field {
 					!reg_mut.can_regions_join(r_idx, n_idx, &solution_cells)
 				}
 				{
+					print!("Regions {} and {} cannot join\n", r_idx, n_idx);
 					fails -= 1;
 					if fails <= 0 {
 						break 'outer2;
@@ -496,7 +499,7 @@ impl Field {
 				}
 				// Attempt to join the regions
 				let new_idx = reg_mut.join(r_idx, n_idx);
-				print!("Trying {} + {} => {}", r_idx, n_idx, new_idx);
+				print!("Trying {} + {} => {}\n", r_idx, n_idx, new_idx);
 			}
 			
 			// See if there's still only one solution
@@ -506,6 +509,7 @@ impl Field {
 			
             if solutions.len() == 1 {
 				print!("One solution\n");
+				successes += 1;
                 continue;
             }
 			
@@ -514,6 +518,8 @@ impl Field {
 			self.regions = Rc::new(regions_copy);
 			fails -= 1;
         }
+		
+		print!("{} successes; {} failures\n", successes, fails);
     }
 
     pub fn fill_solution(&mut self) {
